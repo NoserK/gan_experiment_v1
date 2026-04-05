@@ -1,0 +1,318 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── packages ──────────────────────────────────────────────
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{natbib}
+\usepackage{xcolor}
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!50!black}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\bx}{\bm{x}}
+\newcommand{\bs}{\bm{s}}
+\newcommand{\bmu}{\bm{\mu}}
+\newcommand{\bSigma}{\bm{\Sigma}}
+\DeclareMathOperator{\diag}{diag}
+
+\title{\textbf{Data-Generation Schemes for Bivariate Spatial Simulation}\\[4pt]
+       \large Non-Stationary and Non-Gaussian Settings}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+%=====================================================================
+\section{Common Setup}
+%=====================================================================
+
+Both simulation schemes share the following spatial domain and sampling design.
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Regular grid.}
+    Define two marginal grids $x_k = k/79$, $k=0,1,\dots,79$ and
+    $y_l = l/79$, $l=0,1,\dots,79$.
+    The full grid is $\mathcal{G} = \{(x_k,y_l)\} \subset [0,1]^2$ with
+    $|\mathcal{G}|=6400$.
+
+  \item \textbf{Sub-sampling.}
+    From $\mathcal{G}$ we draw $N=1200$ locations uniformly at random
+    without replacement, yielding $\{\bs_i\}_{i=1}^{N}$.
+
+  \item \textbf{Train / test split.}
+    For every Monte-Carlo replicate, we randomly assign $N_{\text{train}}=1080$
+    points to the training set and $N_{\text{test}}=120$ to the test set.
+
+  \item \textbf{Number of replicates.}
+    All results are averaged over $B=50$ independent simulation replicates.
+\end{enumerate}
+
+%=====================================================================
+\section{Scheme~1: Non-Stationary Bivariate Field}
+\label{sec:ns}
+%=====================================================================
+
+\subsection{Multi-Resolution Wendland Basis}
+
+We construct a multi-resolution set of compactly-supported basis functions.
+Let the number of knots at resolution $r$ be
+$K_r \in \{4,\,9,\,25\}$ (i.e.\ $2^2,\,3^2,\,5^2$).
+For resolution $r$, define a one-dimensional knot sequence
+\[
+  t_j^{(r)} = \frac{j}{\sqrt{K_r}-1}, \qquad j=0,1,\dots,\sqrt{K_r}-1,
+\]
+and form the two-dimensional knot set
+$\mathcal{D}_r = \{(t_j^{(r)},\,t_k^{(r)})\}$.
+
+For each knot $\bm{d}_m \in \mathcal{D}_r$ the Wendland $C^6$ radial basis function
+evaluated at location $\bs$ is
+\begin{equation}\label{eq:wendland}
+  \phi_m(\bs) =
+  \begin{cases}
+    \dfrac{(1-\|\bs-\bm{d}_m\|)^{6}\,
+          \bigl(35\|\bs-\bm{d}_m\|^{2}+18\|\bs-\bm{d}_m\|+3\bigr)}{3},
+      & 0 \le \|\bs-\bm{d}_m\| \le 1,\\[6pt]
+    0, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+
+Stacking all resolutions gives the $N\times P$ basis matrix
+$\bm{\Phi}=[\phi_m(\bs_i)]$, where $P = 4+9+25 = 38$.
+
+\subsection{Bivariate Response Generation}
+
+Partition the columns of $\bm{\Phi}$ into even-indexed columns
+$\bm{\Phi}_{\text{even}}$ and odd-indexed columns $\bm{\Phi}_{\text{odd}}$.
+At each replicate, draw six coefficients independently and uniformly:
+\[
+  a,\,b,\,c,\,d,\,e,\,f \;\sim\; \text{Uniform}\!\bigl(\{-2.5,\,-2.449,\dots,2.5\}\bigr).
+\]
+
+The two response variables are
+\begin{align}
+  Z_1(\bs_i) &= \sum_m \Bigl[
+        a\,\bigl(\bm{\Phi}_{\text{even}}\bigr)_{im}^{3/2}
+      + c\,\bigl(\bm{\Phi}_{\text{odd}}\bigr)_{im}
+      - b\,\sqrt{\bigl(\bm{\Phi}_{\text{even}}\bigr)_{im}
+                 \bigl(\bm{\Phi}_{\text{odd}}\bigr)_{im}}
+    \Bigr], \label{eq:ns_var1}\\[4pt]
+  Z_2(\bs_i) &= \sum_m \Bigl[
+        d\,\bigl(\bm{\Phi}_{\text{even}}\bigr)_{im}
+      - f\,\bigl(\bm{\Phi}_{\text{odd}}\bigr)_{im}^{3/2}
+    \Bigr]. \label{eq:ns_var2}
+\end{align}
+
+\noindent
+Because the coefficients and nonlinear transforms change across replicates,
+the resulting fields are non-stationary (the local mean and variance depend
+on the spatial location~$\bs$).
+
+%=====================================================================
+\section{Scheme~2: Non-Gaussian Bivariate Field with Covariates}
+\label{sec:ng}
+%=====================================================================
+
+\subsection{Bivariate Mat\'ern Cross-Covariance}
+
+Let $\|\bs_i-\bs_j\|=h$.  The Mat\'ern correlation function is
+\begin{equation}\label{eq:matern}
+  \mathcal{M}(h;\,\alpha,\,\nu)
+  = \frac{2^{1-\nu}}{\Gamma(\nu)}
+    \Bigl(\frac{h}{\sqrt{\alpha}}\Bigr)^{\!\nu}
+    K_{\nu}\!\Bigl(\frac{h}{\sqrt{\alpha}}\Bigr),
+  \qquad h>0,
+\end{equation}
+with $\mathcal{M}(0;\alpha,\nu)=1$.
+Here $K_\nu$ is the modified Bessel function of the second kind.
+
+The $2N\times 2N$ block covariance matrix for the bivariate field is
+\[
+  \bSigma_{\text{biv}} =
+  \begin{pmatrix}
+    \bSigma_{11} & \bSigma_{12}\\
+    \bSigma_{12}^\top & \bSigma_{22}
+  \end{pmatrix},
+\]
+where
+\begin{align}
+  (\bSigma_{11})_{ij} &= \sigma_{11}\;\mathcal{M}(h;\,\alpha_{11},\,\nu_{11}), \\
+  (\bSigma_{22})_{ij} &= \sigma_{22}\;\mathcal{M}(h;\,\alpha_{22},\,\nu_{22}), \\
+  (\bSigma_{12})_{ij} &= \kappa\;\mathcal{M}(h;\,\alpha_{12},\,\nu_{12}).
+\end{align}
+The cross-covariance scaling constant is
+\[
+  \kappa
+  = \frac{\sqrt{\sigma_{11}\sigma_{22}}\;R\;
+          \Gamma(\nu_{12})}
+         {\sqrt{\Gamma(\nu_{11})\,\Gamma(\nu_{22})}}
+  \;\cdot\;
+  \frac{\sqrt{\alpha_{11}^{\,\nu_{11}}\;\alpha_{22}^{\,\nu_{22}}}}
+       {\alpha_{12}^{\,\nu_{12}}},
+\]
+with the parameter values listed in Table~\ref{tab:params}.
+
+\begin{table}[h]
+\centering
+\caption{Bivariate Mat\'ern parameters.}\label{tab:params}
+\smallskip
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+ & $\sigma$ & $\nu$ & $\alpha$ & $R$ \\
+\midrule
+Variable 1 & 0.7 & 0.3 & 0.05 & --- \\
+Variable 2 & 0.8 & 0.6 & 0.10 & --- \\
+Cross      & --- & 0.45 & 0.075 & 0.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Spatial Covariates}
+
+Five covariates $x_1,\dots,x_5$ are generated as independent realisations of a
+Gaussian process with constant mean
+$\mu_k \sim \text{Uniform}(\{-2.5,\dots,2.5\})$ and Mat\'ern covariance
+$\sigma_c\,\mathcal{M}(h;\,0.1,\,0.5)$ with $\sigma_c=0.9$.
+
+\subsection{Nonlinear Mean Function}
+
+The shared (location-dependent) mean function is
+\begin{equation}\label{eq:mean}
+\begin{aligned}
+  m(\bs) &= x_1^2 - x_2^2 + x_3^2 - x_4^2 - x_5^2
+           + 2x_1 x_2 + 3x_2 x_3 - 2x_3 x_5 + 10 x_1 x_4 \\
+         &\quad + \sin(x_1)\,x_2\,x_3
+           + \cos(x_2)\,x_3\,x_5
+           + x_1 x_2 x_4 x_5.
+\end{aligned}
+\end{equation}
+
+\subsection{Tukey $g$--$h$ Transformation}
+
+Draw a single bivariate Gaussian realisation
+\[
+  \begin{pmatrix} W_1 \\ W_2 \end{pmatrix}
+  \sim \mathcal{N}\!\Bigl(\bm{0},\;\bSigma_{\text{biv}}\Bigr).
+\]
+
+The Tukey $g$--$h$ transform of a standard Gaussian variable $W$ with
+parameters $(g,h)$ is
+\begin{equation}\label{eq:tukey}
+  T_{g,h}(W) = \frac{e^{gW}-1}{g}\;\exp\!\Bigl(\frac{h\,W^2}{2}\Bigr).
+\end{equation}
+
+The observed responses are
+\begin{align}
+  Z_1(\bs_i) &= T_{0.8,\;0.5}(W_{1i}) + m(\bs_i), \\
+  Z_2(\bs_i) &= T_{-0.8,\;0.5}(W_{2i}) + m(\bs_i).
+\end{align}
+
+\noindent
+The positive $g$ for $Z_1$ induces right skewness; the negative $g$ for~$Z_2$
+induces left skewness.  The $h=0.5$ parameter produces heavy tails in both
+margins, making the joint distribution substantially non-Gaussian.
+
+%=====================================================================
+\section{Estimation and Evaluation}
+%=====================================================================
+
+\subsection{Methods}
+
+Given training data $\{(\bs_i,\bm{Z}_i)\}_{i=1}^{1080}$, we predict
+$\hat{\bm{Z}}_j$ at each test location $\bs_j$ ($j=1,\dots,120$) using:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Conditional GAN (cGAN).}
+    A generator $G_\theta(\bs,\bm{z})$ maps spatial coordinates (and
+    covariates, if available) plus noise $\bm{z}\sim\mathcal{N}(\bm{0},\bm{I}_{32})$
+    to $\hat{\bm{Z}}\in\R^2$.  A discriminator $D_\psi$ distinguishes real
+    from generated pairs.  At prediction time we draw $S=200$ samples per
+    test location and report the empirical mean and standard deviation.
+
+  \item \textbf{$K$-Nearest Neighbours (KNN).}
+    Distance-weighted regression with $K=10$ in the (standardised)
+    feature space.
+
+  \item \textbf{Random Forest (RF).}
+    An ensemble of 300 regression trees (maximum depth 15), fitted
+    independently for each response variable.  Prediction uncertainty is
+    obtained from across-tree variance.
+\end{enumerate}
+
+\subsection{Metrics}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Mean Squared Error (MSE).}
+    \[
+      \text{MSE} = \frac{1}{N_{\text{test}}}
+        \sum_{j=1}^{N_{\text{test}}} \|\bm{Z}_j - \hat{\bm{Z}}_j\|^2.
+    \]
+
+  \item \textbf{Mean Absolute Error (MAE).}
+    \[
+      \text{MAE} = \frac{1}{N_{\text{test}}}
+        \sum_{j=1}^{N_{\text{test}}} \|\bm{Z}_j - \hat{\bm{Z}}_j\|_1.
+    \]
+
+  \item \textbf{Mahalanobis Distance (MD).}
+    Let $\hat{\bSigma}$ be the empirical covariance of the residuals.  Then
+    \[
+      \text{MD} = \frac{1}{N_{\text{test}}}
+        \sum_{j=1}^{N_{\text{test}}}
+        \sqrt{(\bm{Z}_j-\hat{\bm{Z}}_j)^\top
+              \hat{\bSigma}^{-1}
+              (\bm{Z}_j-\hat{\bm{Z}}_j)}.
+    \]
+
+  \item \textbf{Continuous Ranked Probability Score (CRPS).}
+    For a Gaussian predictive distribution
+    $\hat{Z}_{jv}\sim\mathcal{N}(\hat\mu_{jv},\hat\sigma_{jv}^2)$:
+    \[
+      \text{CRPS}(\hat\mu,\hat\sigma,z)
+      = \hat\sigma\!\left[
+          \zeta\,\Phi(\zeta) + \varphi(\zeta) - \frac{1}{\sqrt\pi}
+        \right],
+      \qquad \zeta = \frac{z-\hat\mu}{\hat\sigma},
+    \]
+    where $\Phi$ and $\varphi$ are the standard normal CDF and PDF.
+
+  \item \textbf{95\% Coverage (COV95).}
+    Fraction of test observations falling within
+    $[\hat\mu - 1.96\hat\sigma,\;\hat\mu + 1.96\hat\sigma]$.
+    Ideal value: 0.95.
+\end{enumerate}
+
+%=====================================================================
+\section{Summary}
+%=====================================================================
+
+Table~\ref{tab:overview} summarises the two simulation schemes.
+
+\begin{table}[h]
+\centering
+\caption{Overview of the two data-generation schemes.}\label{tab:overview}
+\smallskip
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Feature & Scheme 1 (Non-Stationary) & Scheme 2 (Non-Gaussian) \\
+\midrule
+Spatial domain     & $[0,1]^2$       & $[0,1]^2$ \\
+Grid size          & $80\times80$    & $80\times80$ \\
+Sample size $N$    & 1200            & 1200 \\
+Training / test    & 1080 / 120      & 1080 / 120 \\
+Basis / covariance & Wendland $C^6$  & Bivariate Mat\'ern \\
+Non-Gaussianity    & ---             & Tukey $g$--$h$ \\
+Covariates         & None            & 5 spatial GPs \\
+Mean function      & Nonlinear basis & Nonlinear (Eq.~\ref{eq:mean}) \\
+Replicates $B$     & 50              & 50 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}
